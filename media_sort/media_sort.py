@@ -93,9 +93,13 @@ class FileProperties:
     def get_dst_file_name(self):
         return self.dst_file.replace(self.root_path, "")
 
+    def set_duplicate_count(self, count):
+        self.date_append = "_" + str(count)
+
     def set_date_as_file_name(self):
         filename, ext = os.path.splitext(os.path.basename(self.src_file))
-        self.dst_file = self.dst_file.replace(filename, get_formatted_date(self.date_taken))
+        formatted_date = get_formatted_date(self.date_taken) + self.date_append
+        self.dst_file = self.dst_file.replace(filename, formatted_date)
 
     def copy(self):
         dirname = os.path.dirname(self.dst_file)
@@ -387,6 +391,7 @@ def find_and_remove_duplicates(file_props):
                         dirname = os.path.dirname(fp.dest_file)
                         filename, ext = os.path.splitext(os.path.basename(fp.dest_file))
                         filename_mod = add_seconds_to_date(filename, count)
+                        ## set_duplicate_count
                         count += 1
                         new_file = os.path.join(dirname, filename_mod + ext)
                         #print(new_file)
@@ -398,6 +403,13 @@ def find_and_remove_duplicates(file_props):
         return "Found 0 duplicate files!\n"
     else:
         return output_str
+
+def copy_files(file_prop_list):
+    if len(file_prop_list) > 0:
+        printProgressBar(0, len(file_prop_list), prefix = 'Copying:', suffix = 'Complete', length = 50)
+        for i, fp in enumerate(file_prop_list):
+            fp.copy()
+            printProgressBar(i + 1, len(file_prop_list), prefix = 'Copying:', suffix = 'Complete', length = 50)
 
 if __name__ == '__main__':
 
@@ -411,14 +423,12 @@ if __name__ == '__main__':
     valid_dest = root + "_mod"
     invalid_dest = root + "_error"
 
-    copy_files = args.cp
+    do_copy = args.cp
     date_mod_check = args.dm
     ignore_dup = args.id
 
     valid_date_limit = datetime.datetime.strptime("2001:01:01 00:00:00", "%Y:%m:%d %H:%M:%S")
 
-    invalid_file_names = list()
-    valid_file_names = list()
     valid_file_props = list()
     invalid_file_props = list()
     file_list = get_files_in_dir(root)
@@ -434,15 +444,9 @@ if __name__ == '__main__':
 
     #output_str = find_and_remove_duplicates(valid_file_props)
 
-    # print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_names)), bcolors.ENDC)
-    # for fp in valid_file_props:
-    #     print(bcolors.OKGREEN, "{: <60} ---> {}".format(fp.original_path, fp.modified_path), bcolors.ENDC)
-
-
-    print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_names)), bcolors.ENDC)
+    print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_props)), bcolors.ENDC)
     for fp in valid_file_props:
         print(bcolors.OKGREEN, "{: <60} ---> {}".format(fp.get_src_file_name(), fp.get_dst_file_name()), bcolors.ENDC)
-
 
     #print(bcolors.WARNING, output_str, bcolors.ENDC, end='')
 
@@ -451,16 +455,6 @@ if __name__ == '__main__':
         formatted_date = get_formatted_date(get_file_modified_date(fp))
         print(bcolors.FAIL, "{: <60} ---> {}".format(fp.get_src_file_name(), formatted_date), bcolors.ENDC)
 
-    if copy_files:
-        printProgressBar(0, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
-        for i, fp in enumerate(valid_file_props):
-            #shutil.copy(fp.src_file, fp.dest_file)
-            fp.copy()
-            printProgressBar(i + 1, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
-
-    if copy_files:
-        printProgressBar(0, len(invalid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
-        for i, fp in enumerate(invalid_file_props):
-            #shutil.copy(fp.src_file, fp.dest_file)
-            fp.copy()
-            printProgressBar(i + 1, len(invalid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
+    if do_copy:
+        copy_files(valid_file_props)
+        copy_files(invalid_file_props)
