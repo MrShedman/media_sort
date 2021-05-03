@@ -4,6 +4,8 @@ import os
 import datetime
 import exifread
 from PIL import Image
+from hachoir.core import config as HachoirConfig
+HachoirConfig.quiet = True
 from hachoir.parser import createParser
 from hachoir.metadata import extractMetadata
 from enum import Enum
