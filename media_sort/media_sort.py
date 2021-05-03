@@ -120,10 +120,10 @@ def get_files_in_dir(dir):
     return file_list
 
 def get_pretty_name(date_taken):
-    date_taken_str = str(date_taken)
-    bad_chars = ":- "
-    for i in bad_chars:
-        date_taken_str = date_taken_str.replace(i, '_')
+    if date_taken is not None:
+        date_taken_str = date_taken.strftime("%Y_%m_%d_%H_%M_%S")
+    else:
+        date_taken_str = "ERR_DATE"
     return date_taken_str
 
 def check_valid_date(date):
@@ -352,7 +352,7 @@ if __name__ == '__main__':
 
     print(bcolors.FAIL, "Found {} bad files!".format(len(invalid_file_names)), bcolors.ENDC)
     for file in invalid_file_names:
-        print(bcolors.FAIL, file, bcolors.ENDC)
+        print(bcolors.FAIL, "{: <60} ---> {}".format(file.replace(root, ""), get_pretty_name(get_file_modified_time(file))), bcolors.ENDC)
 
     if copy_files:
         printProgressBar(0, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
