@@ -118,7 +118,7 @@ def find_and_remove_duplicates(file_props):
         fp_list = sorted(fp_list, key=lambda x:x.size, reverse=True)
         output_str += print_to_string("Duplicates: ")#, end="")
         for fp in fp_list:
-            output_str += print_to_string("\t{: <40}".format(fp.get_src_file_name()))#, end='')
+            output_str += print_to_string("\t{:<80}{}".format(fp.get_src_file_name(), fp.file_type))#, end='')
         output_str += print_to_string()
 
     for key, fp_list in dups.items():
@@ -182,7 +182,7 @@ if __name__ == '__main__':
 
     print(TermColors.OKGREEN, "Found {} good files!".format(len(valid_file_props)), TermColors.ENDC)
     for fp in valid_file_props:
-        print(TermColors.OKGREEN, "{: <60} {} ---> {}".format(fp.get_src_file_name(), fp.parse_method.value, fp.get_dst_file_name()), TermColors.ENDC)
+        print(TermColors.OKGREEN, "{: <60} {} --- {} ---> {}".format(fp.get_src_file_name(), fp.file_type, fp.parse_method.value, fp.get_dst_file_name()), TermColors.ENDC)
 
     print(TermColors.WARNING, output_str, TermColors.ENDC, end='')
 
@@ -191,7 +191,7 @@ if __name__ == '__main__':
         fmod = FileModifiedParser(fp.src_file)
         date, parse_type = fmod.get_result()
         formatted_date = get_formatted_date(date)
-        print(TermColors.FAIL, "{: <60} ---> {}".format(fp.get_src_file_name(), formatted_date), TermColors.ENDC)
+        print(TermColors.FAIL, "{: <60} {} ---> {}".format(fp.get_src_file_name(), fp.file_type, formatted_date), TermColors.ENDC)
 
     if do_copy:
         copy_files(valid_file_props)
