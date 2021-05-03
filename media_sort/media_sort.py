@@ -68,9 +68,12 @@ class FileProperties:
         self.set_date_as_file_name()
 
     def set_date_as_file_name(self):
-        filename, ext = os.path.splitext(os.path.basename(self.src_file))
-        formatted_date = self.date_taken + self.date_append
-        self.dst_file = self.src_file.replace(filename, formatted_date)
+        file_name, ext = os.path.splitext(os.path.basename(self.src_file))
+        formatted_file_name = self.date_taken + self.date_append + ext
+        self.dst_file = os.path.join(os.path.dirname(self.dst_file), formatted_file_name)
+
+    def replace_root_path(self, new_path):
+        self.dst_file = self.src_file.replace(self.root_path, new_path)
 
     def copy(self):
         dirname = os.path.dirname(self.dst_file)
@@ -199,19 +202,6 @@ def get_date_taken(file_prop):
     
     return date
 
-def handle_invalid(file):
-    file.dst_file = file.src_file.replace(file.root_path, invalid_dest)
-    invalid_file_props.append(file)
-
-def handle_valid(file):
-    file.dst_file = file.src_file.replace(file.root_path, valid_dest)
-    file.set_date_taken(date_taken)
-    valid_file_props.append(file)
-
-def add_seconds_to_date(date_str, seconds):
-    date_new = date_str + "_" + str(seconds)
-    return date_new
-
 def print_to_string(*args, **kwargs):
     output = io.StringIO()
     print(*args, file=output, **kwargs)
@@ -288,9 +278,12 @@ if __name__ == '__main__':
     for i, file in enumerate(file_list):
         date_taken = get_date_taken(file)
         if date_taken is None:
-            handle_invalid(file)
+            file.replace_root_path(invalid_dest)
+            invalid_file_props.append(file)
         else:
-            handle_valid(file)
+            file.replace_root_path(valid_dest)
+            file.set_date_taken(date_taken)
+            valid_file_props.append(file)
         printProgressBar(i + 1, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
 
     output_str = find_and_remove_duplicates(valid_file_props)
