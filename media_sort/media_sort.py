@@ -1,36 +1,14 @@
 #!/usr/bin/env python3
 
 import os
-import io
 import datetime
 import shutil
-from PIL import Image
-from hachoir.parser import createParser
-from hachoir.metadata import extractMetadata
 import argparse
 import mimetypes
-import exifread
 from collections import Counter
-from enum import Enum
 
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
-
-class ParseType(Enum):   
-    EXIFREAD = "exifread"
-    PILLOW = "Pillow"
-    HACHOIR = "hachoir"
-    FILEDATE = "File date"
-    ERROR = "No date found"
+from media_sort.parsers import FileModifiedParser, PillowParser, ExifReadParser, HachoirParser, ParseType
+from media_sort.utils import printProgressBar, print_to_string, TermColors
 
 def get_formatted_date(date):
     if date is not None:
@@ -42,12 +20,12 @@ class FileProperties:
     def __init__(self, original_path):
         self.src_file = original_path
         self.dst_file = original_path
-        self.root_path = os.getcwd()    
+        self.root_path = os.getcwd()
 
         self.size = os.path.getsize(self.src_file)
 
         self.date_taken = None
-        self.date_found_method = ParseType.ERROR
+        self.parse_method = ParseType.ERROR
         self.file_type = mimetypes.guess_type(self.src_file)[0]
         self.is_duplicate = False
         self.is_valid = False
@@ -68,9 +46,12 @@ class FileProperties:
         self.set_date_as_file_name()
 
     def set_date_as_file_name(self):
-        filename, ext = os.path.splitext(os.path.basename(self.src_file))
-        formatted_date = self.date_taken + self.date_append
-        self.dst_file = self.src_file.replace(filename, formatted_date)
+        file_name, ext = os.path.splitext(os.path.basename(self.src_file))
+        formatted_file_name = self.date_taken + self.date_append + ext
+        self.dst_file = os.path.join(os.path.dirname(self.dst_file), formatted_file_name)
+
+    def replace_root_path(self, new_path):
+        self.dst_file = self.src_file.replace(self.root_path, new_path)
 
     def copy(self):
         dirname = os.path.dirname(self.dst_file)
@@ -86,27 +67,6 @@ class FileProperties:
     def __hash__(self):
         return hash(self.date_taken)
 
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
-    """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
-        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
-    """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
-    # Print New Line on Complete
-    if iteration == total: 
-        print()
-
 def get_files_in_dir(dir):
     file_list = list()
     for path, subdirs, files in os.walk(dir):
@@ -114,110 +74,33 @@ def get_files_in_dir(dir):
             file_list.append(FileProperties(os.path.join(path, name)))
     return file_list
 
-def get_value_in_nested_dict(d, key):
-    for k, v in d.items():
-        if isinstance(v, dict):
-            if key in v:
-                return v[key]
-            else:
-                get_value_in_nested_dict(v, key)
-        if key in v:
-            return v[key]
-    return None
-
-def check_valid_date(date):
-    if date > valid_date_limit:
-        return date
-    else:
-        return None
-
-def get_file_modified_date(file_prop):
-        timestamp = os.path.getmtime(file_prop.src_file)
-        date = datetime.datetime.fromtimestamp(timestamp)
-        return check_valid_date(date)
-
-def parse_date(date, format = "%Y:%m:%d %H:%M:%S"):
-    date_obj = None
-    try:
-        date_obj = datetime.datetime.strptime(str(date), format)
-    except:
-        return None
-    else: 
-        return check_valid_date(date_obj)
-
 def parse_video(file_prop):
-    parser = createParser(file_prop.src_file)
-    if not parser:
-        print("Unable to parse file %s" % file_prop.src_file)
-        return None
-    with parser:
-        try:
-            metadata = extractMetadata(parser)
-        except Exception as err:
-            print("Metadata extraction error: %s" % err)
-            metadata = None
-    if not metadata:
-        print("Unable to extract metadata")
-        return None
-    meta = metadata.exportDictionary()
-    date = get_value_in_nested_dict(meta, "Creation date")
-    if date is not None:
-        return parse_date(date, format="%Y-%m-%d %H:%M:%S")
-    return None
+    hachoir = HachoirParser(file_prop.src_file)
+    return hachoir.get_date()
 
 def parse_image(file_prop):
-    f = open(file_prop.src_file, 'rb')
-    dates = list()
-    dates.append(None)
-    tags = exifread.process_file(f, stop_tag="DateTimeOriginal", details=False)
-    field = "EXIF DateTimeOriginal"
-
-    if field in tags:
-        dates.append(parse_date(tags[field]))
-
-    if dates[-1] is None:
-        exif = Image.open(f).getexif()
-        tags = [36867, 306]
-        for tag in tags:
-            if tag in exif:
-                dates.append(parse_date(exif[tag]))
+    exifread = ExifReadParser(file_prop.src_file)
+    date, parse_type = exifread.get_date()
+    if date is None:
+        pillow = PillowParser(file_prop.src_file)
+        date, parse_type = pillow.get_date()
     
-    dates_sorted = sorted(dates, key=lambda x: (x is None, x))
-    f.close()
-    return dates_sorted[0]
+    return date, parse_type
 
 def get_date_taken(file_prop):
     date = None
+    parse_type = ParseType.ERROR
     if file_prop.file_type is not None:
         if "image" in file_prop.file_type:
-            date = parse_image(file_prop)
+            date, parse_type = parse_image(file_prop)
         else:
-            date = parse_video(file_prop)
+            date, parse_type = parse_video(file_prop)
 
     if date is None and date_mod_check:
-        date = get_file_modified_date(file_prop)
+        fmod = FileModifiedParser(file_prop.src_file)
+        date, parse_type = fmod.get_date()
     
-    return date
-
-def handle_invalid(file):
-    file.dst_file = file.src_file.replace(file.root_path, invalid_dest)
-    invalid_file_props.append(file)
-
-def handle_valid(file):
-    file.dst_file = file.src_file.replace(file.root_path, valid_dest)
-    file.set_date_taken(date_taken)
-    valid_file_props.append(file)
-
-def add_seconds_to_date(date_str, seconds):
-    date_new = date_str + "_" + str(seconds)
-    return date_new
-
-def print_to_string(*args, **kwargs):
-    output = io.StringIO()
-    print(*args, file=output, **kwargs)
-    contents = output.getvalue()
-    output.close()
-    return contents
+    return date, parse_type
 
 def find_and_remove_duplicates(file_props):
     d =  Counter(file_props) 
@@ -278,33 +161,37 @@ if __name__ == '__main__':
     date_mod_check = args.dm
     ignore_dup = args.id
 
-    valid_date_limit = datetime.datetime.strptime("2001:01:01 00:00:00", "%Y:%m:%d %H:%M:%S")
-
     valid_file_props = list()
     invalid_file_props = list()
     file_list = get_files_in_dir(root)
     
     printProgressBar(0, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
     for i, file in enumerate(file_list):
-        date_taken = get_date_taken(file)
+        date_taken, parse_type = get_date_taken(file)
         if date_taken is None:
-            handle_invalid(file)
+            file.replace_root_path(invalid_dest)
+            invalid_file_props.append(file)
         else:
-            handle_valid(file)
+            file.replace_root_path(valid_dest)
+            file.set_date_taken(date_taken)
+            file.parse_method = parse_type
+            valid_file_props.append(file)
         printProgressBar(i + 1, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
 
     output_str = find_and_remove_duplicates(valid_file_props)
 
-    print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_props)), bcolors.ENDC)
+    print(TermColors.OKGREEN, "Found {} good files!".format(len(valid_file_props)), TermColors.ENDC)
     for fp in valid_file_props:
-        print(bcolors.OKGREEN, "{: <60} ---> {}".format(fp.get_src_file_name(), fp.get_dst_file_name()), bcolors.ENDC)
+        print(TermColors.OKGREEN, "{: <60} {} ---> {}".format(fp.get_src_file_name(), fp.parse_method.value, fp.get_dst_file_name()), TermColors.ENDC)
 
-    print(bcolors.WARNING, output_str, bcolors.ENDC, end='')
+    print(TermColors.WARNING, output_str, TermColors.ENDC, end='')
 
-    print(bcolors.FAIL, "Found {} bad files!".format(len(invalid_file_props)), bcolors.ENDC)
+    print(TermColors.FAIL, "Found {} bad files!".format(len(invalid_file_props)), TermColors.ENDC)
     for fp in invalid_file_props:
-        formatted_date = get_formatted_date(get_file_modified_date(fp))
-        print(bcolors.FAIL, "{: <60} ---> {}".format(fp.get_src_file_name(), formatted_date), bcolors.ENDC)
+        fmod = FileModifiedParser(fp.src_file)
+        date, parse_type = fmod.get_date()
+        formatted_date = get_formatted_date(date)
+        print(TermColors.FAIL, "{: <60} ---> {}".format(fp.get_src_file_name(), formatted_date), TermColors.ENDC)
 
     if do_copy:
         copy_files(valid_file_props)
