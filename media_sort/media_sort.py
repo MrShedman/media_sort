@@ -11,6 +11,7 @@ import argparse
 import mimetypes
 import exifread
 from collections import Counter
+from enum import Enum
 
 class bcolors:
     HEADER = '\033[95m'
@@ -23,16 +24,65 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
+class ParseType(Enum):
+    # EXIFREAD = 0
+    # PILLOW = 1
+    # HACHOIR = 2
+    # FILEDATE = 3
+
+    # level_name = {
+    #     EXIFREAD: "exifread",
+    #     PILLOW: "Pillow",
+    #     HACHOIR: "hachoir",
+    #     FILEDATE: "File date"
+    # }
+
+    
+    EXIFREAD = "exifread"
+    PILLOW = "Pillow"
+    HACHOIR = "hachoir"
+    FILEDATE = "File date"
+    ERROR = "No date found"
+
 class FileProperties:
-    def __init(self):
-        self.original_path = ""
-        self.modified_path = ""
+    def __init__(self, original_path):
+        self.original_path = original_path
+        self.modified_path = original_path
         self.date_str = ""
         self.file_size = ""
         self.file_name = ""
         self.src_file = ""
         self.dest_file = ""
 
+        #self.src_file = ""
+        self.root_path = os.getcwd()
+        #self.original_path = ""
+        self.new_path = original_path
+
+        self.size = os.path.getsize(self.original_path)
+
+        self.date_taken = None
+        self.date_found_method = ParseType.ERROR
+        self.file_type = mimetypes.guess_type(self.original_path)[0]
+        self.is_duplicate = False
+        self.date_append = ""
+
+    def get_original_file_name(self):
+        return self.original_path.replace(self.root_path, "")
+
+    def get_new_file_name(self):
+        return self.new_path.replace(self.root_path, "")
+
+    def pretty_date(self):
+        if self.date_taken is not None:
+            date_taken_str = str(self.date_taken)
+            bad_chars = ":- "
+            for i in bad_chars:
+                date_taken_str = date_taken_str.replace(i, '_')
+            filename, ext = os.path.splitext(os.path.basename(self.original_path))
+            self.new_path = self.new_path.replace(filename, date_taken_str)
+            
     def __eq__(self, other):
         if type(other) is type(self):
             return self.date_str == other.date_str
@@ -184,16 +234,19 @@ def handle_invalid(file):
 
 def handle_valid(file):
     dest_dir, filename, ext = get_dest_dir(file, valid_dest)
-    dest_file = os.path.join(dest_dir, get_pretty_name(data_taken) + ext)
+    dest_file = os.path.join(dest_dir, get_pretty_name(date_taken) + ext)
 
-    file_prop = FileProperties()
+    file_prop = FileProperties(file)
     file_prop.original_path = file.replace(root, "")
     file_prop.modified_path = dest_file.replace(valid_dest, "")
     file_prop.file_name = os.path.basename(file_prop.modified_path)
-    file_prop.date_str = get_pretty_name(data_taken)
+    file_prop.date_str = get_pretty_name(date_taken)
     file_prop.file_size = os.path.getsize(file)
     file_prop.dest_file = dest_file
     file_prop.src_file = file
+
+    file_prop.date_taken = date_taken
+    file_prop.pretty_date()
 
     valid_file_props.append(file_prop)
     valid_file_names.append(file)
@@ -276,8 +329,8 @@ if __name__ == '__main__':
     
     printProgressBar(0, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
     for i, file in enumerate(file_list):
-        data_taken = get_date_taken(file)
-        if data_taken is None:
+        date_taken = get_date_taken(file)
+        if date_taken is None:
             handle_invalid(file)
         else:
             handle_valid(file)
@@ -288,6 +341,12 @@ if __name__ == '__main__':
     print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_names)), bcolors.ENDC)
     for fp in valid_file_props:
         print(bcolors.OKGREEN, "{: <60} ---> {}".format(fp.original_path, fp.modified_path), bcolors.ENDC)
+
+
+    print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_names)), bcolors.ENDC)
+    for fp in valid_file_props:
+        print(bcolors.OKGREEN, "{: <60} ---> {}".format(fp.get_original_file_name(), fp.get_new_file_name()), bcolors.ENDC)
+
 
     print(bcolors.WARNING, output_str, bcolors.ENDC, end='')
 
