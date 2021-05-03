@@ -135,8 +135,7 @@ def parse_image(filename):
     f = open(filename, 'rb')
     dates = list()
     dates.append(None)
-    tags = exifread.process_file(f)
-
+    tags = exifread.process_file(f, stop_tag="DateTimeOriginal", details=False)
     field = "EXIF DateTimeOriginal"
 
     if field in tags:
@@ -279,14 +278,14 @@ if __name__ == '__main__':
     valid_file_props = list()
     file_list = get_files_in_dir(root)
     
-    printProgressBar(0, len(file_list), prefix = 'Progress:', suffix = 'Complete', length = 50)
+    printProgressBar(0, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
     for i, file in enumerate(file_list):
         data_taken = get_date_taken(file)
         if data_taken is None:
             handle_invalid(file)
         else:
             handle_valid(file)
-        printProgressBar(i + 1, len(file_list), prefix = 'Progress:', suffix = 'Complete', length = 50)
+        printProgressBar(i + 1, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
 
     output_str = find_and_remove_duplicates(valid_file_props)
 
@@ -301,7 +300,7 @@ if __name__ == '__main__':
         print(bcolors.FAIL, file, bcolors.ENDC)
 
     if copy_files:
-        printProgressBar(0, len(valid_file_props), prefix = 'Progress:', suffix = 'Complete', length = 50)
+        printProgressBar(0, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
         for i, fp in enumerate(valid_file_props):
             shutil.copy(fp.src_file, fp.dest_file)
-            printProgressBar(i + 1, len(valid_file_props), prefix = 'Progress:', suffix = 'Complete', length = 50)
+            printProgressBar(i + 1, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
