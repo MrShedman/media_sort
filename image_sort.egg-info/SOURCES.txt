@@ -1,8 +1,0 @@
-setup.py
-image_sort/__init__.py
-image_sort/image_sort.py
-image_sort.egg-info/PKG-INFO
-image_sort.egg-info/SOURCES.txt
-image_sort.egg-info/dependency_links.txt
-image_sort.egg-info/requires.txt
-image_sort.egg-info/top_level.txt

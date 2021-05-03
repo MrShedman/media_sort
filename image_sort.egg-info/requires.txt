@@ -1,4 +1,0 @@
-Pillow
-exifread
-filetype
-hachoir
