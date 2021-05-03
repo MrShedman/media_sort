@@ -116,16 +116,15 @@ def find_and_remove_duplicates(file_props):
     output_str += print_to_string("Found {} duplicate files!".format(len(dups)))
     for key, fp_list in dups.items():
         fp_list = sorted(fp_list, key=lambda x:x.size, reverse=True)
-        output_str += print_to_string("Duplicates: ")#, end="")
+        output_str += print_to_string("Duplicates: ")
         for fp in fp_list:
-            output_str += print_to_string("\t{:<80}{}".format(fp.get_src_file_name(), fp.file_type))#, end='')
+            output_str += print_to_string("\t{:<80}{}".format(fp.get_src_file_name(), fp.file_type))
         output_str += print_to_string()
 
     for key, fp_list in dups.items():
         for c, fp in enumerate(fp_list[1:]):
             base_filename, base_ext = os.path.splitext(fp_list[0].src_file)
             count = c + 1
-            #print(count)
             for i, fpv in enumerate(file_props):
                 if fp == fpv:
                     if fp.src_file == fpv.src_file:
