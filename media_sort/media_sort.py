@@ -11,6 +11,7 @@ import argparse
 import mimetypes
 import exifread
 from collections import Counter
+from enum import Enum
 
 class bcolors:
     HEADER = '\033[95m'
@@ -23,23 +24,67 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
+class ParseType(Enum):   
+    EXIFREAD = "exifread"
+    PILLOW = "Pillow"
+    HACHOIR = "hachoir"
+    FILEDATE = "File date"
+    ERROR = "No date found"
+
+def get_formatted_date(date):
+    if date is not None:
+        return date.strftime("%Y_%m_%d_%H_%M_%S")
+    else:
+        return "ERR_DATE"
+
 class FileProperties:
-    def __init(self):
-        self.original_path = ""
-        self.modified_path = ""
-        self.date_str = ""
-        self.file_size = ""
-        self.file_name = ""
-        self.src_file = ""
-        self.dest_file = ""
+    def __init__(self, original_path):
+        self.src_file = original_path
+        self.dst_file = original_path
+        self.root_path = os.getcwd()    
+
+        self.size = os.path.getsize(self.src_file)
+
+        self.date_taken = None
+        self.date_found_method = ParseType.ERROR
+        self.file_type = mimetypes.guess_type(self.src_file)[0]
+        self.is_duplicate = False
+        self.is_valid = False
+        self.date_append = ""
+
+    def get_src_file_name(self):
+        return self.src_file.replace(self.root_path, "")
+
+    def get_dst_file_name(self):
+        return self.dst_file.replace(self.root_path, "")
+
+    def set_duplicate_count(self, count):
+        self.date_append = "_" + str(count)
+        self.set_date_as_file_name()
+
+    def set_date_taken(self, date):
+        self.date_taken = get_formatted_date(date)
+        self.set_date_as_file_name()
+
+    def set_date_as_file_name(self):
+        filename, ext = os.path.splitext(os.path.basename(self.src_file))
+        formatted_date = self.date_taken + self.date_append
+        self.dst_file = self.src_file.replace(filename, formatted_date)
+
+    def copy(self):
+        dirname = os.path.dirname(self.dst_file)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        shutil.copy(self.src_file, self.dst_file)
 
     def __eq__(self, other):
         if type(other) is type(self):
-            return self.date_str == other.date_str
+            return self.date_taken == other.date_taken
         return False
     
     def __hash__(self):
-        return hash(self.date_str)
+        return hash(self.date_taken)
 
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
     """
@@ -66,26 +111,8 @@ def get_files_in_dir(dir):
     file_list = list()
     for path, subdirs, files in os.walk(dir):
         for name in files:
-            file_list.append(os.path.join(path, name))
+            file_list.append(FileProperties(os.path.join(path, name)))
     return file_list
-
-def get_pretty_name(date_taken):
-    date_taken_str = str(date_taken)
-    bad_chars = ":- "
-    for i in bad_chars:
-        date_taken_str = date_taken_str.replace(i, '_')
-    return date_taken_str
-
-def check_valid_date(date):
-    if date > valid_date_limit:
-        return date
-    else:
-        return None
-
-def get_file_modified_time(filename):
-    timestamp = os.path.getmtime(filename)
-    date = datetime.datetime.fromtimestamp(timestamp)
-    return check_valid_date(date)
 
 def get_value_in_nested_dict(d, key):
     for k, v in d.items():
@@ -98,6 +125,17 @@ def get_value_in_nested_dict(d, key):
             return v[key]
     return None
 
+def check_valid_date(date):
+    if date > valid_date_limit:
+        return date
+    else:
+        return None
+
+def get_file_modified_date(file_prop):
+        timestamp = os.path.getmtime(file_prop.src_file)
+        date = datetime.datetime.fromtimestamp(timestamp)
+        return check_valid_date(date)
+
 def parse_date(date, format = "%Y:%m:%d %H:%M:%S"):
     date_obj = None
     try:
@@ -107,10 +145,10 @@ def parse_date(date, format = "%Y:%m:%d %H:%M:%S"):
     else: 
         return check_valid_date(date_obj)
 
-def parse_video(filename):
-    parser = createParser(filename)
+def parse_video(file_prop):
+    parser = createParser(file_prop.src_file)
     if not parser:
-        print("Unable to parse file %s" % filename)
+        print("Unable to parse file %s" % file_prop.src_file)
         return None
     with parser:
         try:
@@ -127,8 +165,8 @@ def parse_video(filename):
         return parse_date(date, format="%Y-%m-%d %H:%M:%S")
     return None
 
-def parse_image(filename):
-    f = open(filename, 'rb')
+def parse_image(file_prop):
+    f = open(file_prop.src_file, 'rb')
     dates = list()
     dates.append(None)
     tags = exifread.process_file(f, stop_tag="DateTimeOriginal", details=False)
@@ -148,55 +186,27 @@ def parse_image(filename):
     f.close()
     return dates_sorted[0]
 
-def get_date_taken(path):
-    file_type = mimetypes.guess_type(path)[0]
+def get_date_taken(file_prop):
     date = None
-    if file_type is not None:
-        if "image" in file_type:
-            date = parse_image(path)
+    if file_prop.file_type is not None:
+        if "image" in file_prop.file_type:
+            date = parse_image(file_prop)
         else:
-            date = parse_video(path)
+            date = parse_video(file_prop)
 
     if date is None and date_mod_check:
-        date = get_file_modified_time(path)
+        date = get_file_modified_date(file_prop)
     
     return date
 
-def get_dest_dir(file, dest_path):
-    if copy_files:
-        if not os.path.exists(dest_path):
-            os.makedirs(dest_path)
-    dirname = os.path.dirname(file)
-    filename, ext = os.path.splitext(os.path.basename(file))
-    dest_dir = dirname.replace(root, dest_path)
-    if copy_files:
-        if not os.path.exists(dest_dir):
-            os.makedirs(dest_dir)
-
-    return dest_dir, filename, ext
-
 def handle_invalid(file):
-    dest_dir, filename, ext = get_dest_dir(file, invalid_dest)
-    dest_file = os.path.join(dest_dir, os.path.basename(filename) + ext)
-    if copy_files:
-        shutil.copy(file, dest_file)
-    invalid_file_names.append(file)
+    file.dst_file = file.src_file.replace(file.root_path, invalid_dest)
+    invalid_file_props.append(file)
 
 def handle_valid(file):
-    dest_dir, filename, ext = get_dest_dir(file, valid_dest)
-    dest_file = os.path.join(dest_dir, get_pretty_name(data_taken) + ext)
-
-    file_prop = FileProperties()
-    file_prop.original_path = file.replace(root, "")
-    file_prop.modified_path = dest_file.replace(valid_dest, "")
-    file_prop.file_name = os.path.basename(file_prop.modified_path)
-    file_prop.date_str = get_pretty_name(data_taken)
-    file_prop.file_size = os.path.getsize(file)
-    file_prop.dest_file = dest_file
-    file_prop.src_file = file
-
-    valid_file_props.append(file_prop)
-    valid_file_names.append(file)
+    file.dst_file = file.src_file.replace(file.root_path, valid_dest)
+    file.set_date_taken(date_taken)
+    valid_file_props.append(file)
 
 def add_seconds_to_date(date_str, seconds):
     date_new = date_str + "_" + str(seconds)
@@ -214,42 +224,43 @@ def find_and_remove_duplicates(file_props):
     res = [k for k, v in d.items() if v > 1]
     dups = dict()
     for fp_dup in res:
-        dups[fp_dup.date_str] = [fp_dup]
+        dups[fp_dup.date_taken] = [fp_dup]
         for fp in file_props:
-            if fp_dup == fp and fp_dup.original_path != fp.original_path:
-                dups[fp_dup.date_str].append(fp)
+            if fp_dup == fp and fp_dup.src_file != fp.src_file:
+                dups[fp_dup.date_taken].append(fp)
 
     output_str = str()
     output_str += print_to_string("Found {} duplicate files!".format(len(dups)))
     for key, fp_list in dups.items():
-        fp_list = sorted(fp_list, key=lambda x:x.file_size, reverse=True)
+        fp_list = sorted(fp_list, key=lambda x:x.size, reverse=True)
         output_str += print_to_string("Duplicates: ", end="")
         for fp in fp_list:
-            output_str += print_to_string("{: <40}".format(fp.original_path), end='')
+            output_str += print_to_string("{: <40}".format(fp.get_src_file_name()), end='')
         output_str += print_to_string()
 
     for key, fp_list in dups.items():
         for c, fp in enumerate(fp_list[1:]):
-            base_filename, base_ext = os.path.splitext(fp_list[0].file_name)
+            base_filename, base_ext = os.path.splitext(fp_list[0].src_file)
             count = c + 1
             #print(count)
             for i, fpv in enumerate(file_props):
                 if fp == fpv:
-                    if fp.original_path == fpv.original_path:
-                        dirname = os.path.dirname(fp.dest_file)
-                        filename, ext = os.path.splitext(os.path.basename(fp.dest_file))
-                        filename_mod = add_seconds_to_date(filename, count)
+                    if fp.src_file == fpv.src_file:
+                        fp.set_duplicate_count(count)
                         count += 1
-                        new_file = os.path.join(dirname, filename_mod + ext)
-                        #print(new_file)
-                        fp.dest_file = new_file
-                        fp.modified_path = new_file.replace(valid_dest, "")
                         if not ignore_dup:
                             del file_props[i]
     if ignore_dup:
         return "Found 0 duplicate files!\n"
     else:
         return output_str
+
+def copy_files(file_prop_list):
+    if len(file_prop_list) > 0:
+        printProgressBar(0, len(file_prop_list), prefix = 'Copying:', suffix = 'Complete', length = 50)
+        for i, fp in enumerate(file_prop_list):
+            fp.copy()
+            printProgressBar(i + 1, len(file_prop_list), prefix = 'Copying:', suffix = 'Complete', length = 50)
 
 if __name__ == '__main__':
 
@@ -263,21 +274,20 @@ if __name__ == '__main__':
     valid_dest = root + "_mod"
     invalid_dest = root + "_error"
 
-    copy_files = args.cp
+    do_copy = args.cp
     date_mod_check = args.dm
     ignore_dup = args.id
 
     valid_date_limit = datetime.datetime.strptime("2001:01:01 00:00:00", "%Y:%m:%d %H:%M:%S")
 
-    invalid_file_names = list()
-    valid_file_names = list()
     valid_file_props = list()
+    invalid_file_props = list()
     file_list = get_files_in_dir(root)
     
     printProgressBar(0, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
     for i, file in enumerate(file_list):
-        data_taken = get_date_taken(file)
-        if data_taken is None:
+        date_taken = get_date_taken(file)
+        if date_taken is None:
             handle_invalid(file)
         else:
             handle_valid(file)
@@ -285,18 +295,17 @@ if __name__ == '__main__':
 
     output_str = find_and_remove_duplicates(valid_file_props)
 
-    print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_names)), bcolors.ENDC)
+    print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_props)), bcolors.ENDC)
     for fp in valid_file_props:
-        print(bcolors.OKGREEN, "{: <60} ---> {}".format(fp.original_path, fp.modified_path), bcolors.ENDC)
+        print(bcolors.OKGREEN, "{: <60} ---> {}".format(fp.get_src_file_name(), fp.get_dst_file_name()), bcolors.ENDC)
 
     print(bcolors.WARNING, output_str, bcolors.ENDC, end='')
 
-    print(bcolors.FAIL, "Found {} bad files!".format(len(invalid_file_names)), bcolors.ENDC)
-    for file in invalid_file_names:
-        print(bcolors.FAIL, file, bcolors.ENDC)
+    print(bcolors.FAIL, "Found {} bad files!".format(len(invalid_file_props)), bcolors.ENDC)
+    for fp in invalid_file_props:
+        formatted_date = get_formatted_date(get_file_modified_date(fp))
+        print(bcolors.FAIL, "{: <60} ---> {}".format(fp.get_src_file_name(), formatted_date), bcolors.ENDC)
 
-    if copy_files:
-        printProgressBar(0, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
-        for i, fp in enumerate(valid_file_props):
-            shutil.copy(fp.src_file, fp.dest_file)
-            printProgressBar(i + 1, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
+    if do_copy:
+        copy_files(valid_file_props)
+        copy_files(invalid_file_props)
