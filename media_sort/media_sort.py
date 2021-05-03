@@ -129,8 +129,6 @@ def parse_video(filename):
     date = get_value_in_nested_dict(meta, "Creation date")
     if date is not None:
         return parse_date(date, format="%Y-%m-%d %H:%M:%S")
-        # date = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
-        # return check_valid_date(date)
     return None
 
 def parse_image(filename):
@@ -201,10 +199,8 @@ def handle_valid(file):
     file_prop.file_size = os.path.getsize(file)
     file_prop.dest_file = dest_file
     file_prop.src_file = file
-    # print(file_prop.file_size, file_prop.original_path, file_prop.modified_path)
+
     valid_file_props.append(file_prop)
-    #if copy_files:
-    #    shutil.copy(file, dest_file)
     valid_file_names.append(file)
 
 def add_seconds_to_date(date_str, seconds):
@@ -292,10 +288,6 @@ if __name__ == '__main__':
             handle_valid(file)
         printProgressBar(i + 1, len(file_list), prefix = 'Progress:', suffix = 'Complete', length = 50)
 
-    # print("Found {} good files!".format(len(valid_file_names)))
-    # for fp in valid_file_props:
-    #     print("{: <60} ---> {}".format(fp.original_path, fp.modified_path))
-    
     output_str = find_and_remove_duplicates(valid_file_props)
 
     print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_names)), bcolors.ENDC)
@@ -306,7 +298,6 @@ if __name__ == '__main__':
 
     print(bcolors.FAIL, "Found {} bad files!".format(len(invalid_file_names)), bcolors.ENDC)
     for file in invalid_file_names:
-        #print(file)
         print(bcolors.FAIL, file, bcolors.ENDC)
 
     if copy_files:
