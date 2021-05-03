@@ -41,7 +41,7 @@ class FileModifiedParser:
         self.date = check_valid_date(date)
 
     def get_date(self):
-        return self.date
+        return self.date, self.type
 
 class PillowParser:
     def __init__(self, file_name):
@@ -61,7 +61,7 @@ class PillowParser:
             self.date = None
 
     def get_date(self):
-        return self.date
+        return self.date, self.type
 
 class ExifReadParser:
     def __init__(self, file_name):
@@ -79,7 +79,7 @@ class ExifReadParser:
         f.close()
 
     def get_date(self):
-        return self.date
+        return self.date, self.type
 
 class HachoirParser:
     def __init__(self, file_name):
@@ -105,4 +105,4 @@ class HachoirParser:
             self.date = parse_date(date, format="%Y-%m-%d %H:%M:%S")
 
     def get_date(self):
-        return self.date
+        return self.date, self.type

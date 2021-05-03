@@ -3,14 +3,9 @@
 import os
 import datetime
 import shutil
-from PIL import Image
-from hachoir.parser import createParser
-from hachoir.metadata import extractMetadata
 import argparse
 import mimetypes
-import exifread
 from collections import Counter
-from enum import Enum
 
 from media_sort.parsers import FileModifiedParser, PillowParser, ExifReadParser, HachoirParser, ParseType
 from media_sort.utils import printProgressBar, print_to_string, TermColors
@@ -25,12 +20,12 @@ class FileProperties:
     def __init__(self, original_path):
         self.src_file = original_path
         self.dst_file = original_path
-        self.root_path = os.getcwd()    
+        self.root_path = os.getcwd()
 
         self.size = os.path.getsize(self.src_file)
 
         self.date_taken = None
-        self.date_found_method = ParseType.ERROR
+        self.parse_method = ParseType.ERROR
         self.file_type = mimetypes.guess_type(self.src_file)[0]
         self.is_duplicate = False
         self.is_valid = False
@@ -85,26 +80,27 @@ def parse_video(file_prop):
 
 def parse_image(file_prop):
     exifread = ExifReadParser(file_prop.src_file)
-
-    if exifread.get_date() is None:
+    date, parse_type = exifread.get_date()
+    if date is None:
         pillow = PillowParser(file_prop.src_file)
-        return pillow.get_date()
-    else:
-        return exifread.get_date()
+        date, parse_type = pillow.get_date()
+    
+    return date, parse_type
 
 def get_date_taken(file_prop):
     date = None
+    parse_type = ParseType.ERROR
     if file_prop.file_type is not None:
         if "image" in file_prop.file_type:
-            date = parse_image(file_prop)
+            date, parse_type = parse_image(file_prop)
         else:
-            date = parse_video(file_prop)
+            date, parse_type = parse_video(file_prop)
 
     if date is None and date_mod_check:
         fmod = FileModifiedParser(file_prop.src_file)
-        date = fmod.get_date()
+        date, parse_type = fmod.get_date()
     
-    return date
+    return date, parse_type
 
 def find_and_remove_duplicates(file_props):
     d =  Counter(file_props) 
@@ -171,13 +167,14 @@ if __name__ == '__main__':
     
     printProgressBar(0, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
     for i, file in enumerate(file_list):
-        date_taken = get_date_taken(file)
+        date_taken, parse_type = get_date_taken(file)
         if date_taken is None:
             file.replace_root_path(invalid_dest)
             invalid_file_props.append(file)
         else:
             file.replace_root_path(valid_dest)
             file.set_date_taken(date_taken)
+            file.parse_method = parse_type
             valid_file_props.append(file)
         printProgressBar(i + 1, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
 
@@ -185,14 +182,15 @@ if __name__ == '__main__':
 
     print(TermColors.OKGREEN, "Found {} good files!".format(len(valid_file_props)), TermColors.ENDC)
     for fp in valid_file_props:
-        print(TermColors.OKGREEN, "{: <60} ---> {}".format(fp.get_src_file_name(), fp.get_dst_file_name()), TermColors.ENDC)
+        print(TermColors.OKGREEN, "{: <60} {} ---> {}".format(fp.get_src_file_name(), fp.parse_method.value, fp.get_dst_file_name()), TermColors.ENDC)
 
     print(TermColors.WARNING, output_str, TermColors.ENDC, end='')
 
     print(TermColors.FAIL, "Found {} bad files!".format(len(invalid_file_props)), TermColors.ENDC)
     for fp in invalid_file_props:
         fmod = FileModifiedParser(fp.src_file)
-        formatted_date = get_formatted_date(fmod.get_date())
+        date, parse_type = fmod.get_date()
+        formatted_date = get_formatted_date(date)
         print(TermColors.FAIL, "{: <60} ---> {}".format(fp.get_src_file_name(), formatted_date), TermColors.ENDC)
 
     if do_copy:
