@@ -33,19 +33,24 @@ def parse_date(date, format = "%Y:%m:%d %H:%M:%S"):
     else: 
         return check_valid_date(date_obj)
 
-class FileModifiedParser:
-    def __init__(self, file_name):
-        self.type = ParseType.FILEMOD
-        timestamp = os.path.getmtime(file_name)
-        date = datetime.datetime.fromtimestamp(timestamp)
-        self.date = check_valid_date(date)
+class ParserBase:
+    def __init__(self, parse_type):
+        self.type = parse_type
+        self.date = None
 
     def get_result(self):
         return self.date, self.type
 
-class PillowParser:
+class FileModifiedParser(ParserBase):
     def __init__(self, file_name):
-        self.type = ParseType.PILLOW
+        super().__init__(ParseType.FILEMOD)
+        timestamp = os.path.getmtime(file_name)
+        date = datetime.datetime.fromtimestamp(timestamp)
+        self.date = check_valid_date(date)
+
+class PillowParser(ParserBase):
+    def __init__(self, file_name):
+        super().__init__(ParseType.PILLOW)
         exif = Image.open(file_name).getexif()
         tags = [36867, 306]
         dates = list()
@@ -60,12 +65,9 @@ class PillowParser:
         else:
             self.date = None
 
-    def get_result(self):
-        return self.date, self.type
-
-class ExifReadParser:
+class ExifReadParser(ParserBase):
     def __init__(self, file_name):
-        self.type = ParseType.EXIFREAD
+        super().__init__(ParseType.EXIFREAD)
         f = open(file_name, 'rb')
 
         tags = exifread.process_file(f, stop_tag="DateTimeOriginal", details=False)
@@ -78,14 +80,9 @@ class ExifReadParser:
         
         f.close()
 
-    def get_result(self):
-        return self.date, self.type
-
-class HachoirParser:
+class HachoirParser(ParserBase):
     def __init__(self, file_name):
-        self.type = ParseType.HACHOIR
-        self.date = None
-
+        super().__init__(ParseType.HACHOIR)
         parser = createParser(file_name)
         if not parser:
             print("Unable to parse file %s" % file_name)
@@ -103,6 +100,4 @@ class HachoirParser:
         date = get_value_in_nested_dict(meta, "Creation date")
         if date is not None:
             self.date = parse_date(date, format="%Y-%m-%d %H:%M:%S")
-
-    def get_result(self):
-        return self.date, self.type
+            
