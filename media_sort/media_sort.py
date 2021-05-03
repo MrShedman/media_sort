@@ -8,7 +8,7 @@ import mimetypes
 from collections import Counter
 
 from media_sort.parsers import FileModifiedParser, PillowParser, ExifReadParser, HachoirParser, ParseType
-from media_sort.utils import printProgressBar, print_to_string, TermColors
+from media_sort.utils import print_progress_bar, print_to_string, TermColors
 
 def get_formatted_date(date):
     if date is not None:
@@ -76,14 +76,14 @@ def get_files_in_dir(dir):
 
 def parse_video(file_prop):
     hachoir = HachoirParser(file_prop.src_file)
-    return hachoir.get_date()
+    return hachoir.get_result()
 
 def parse_image(file_prop):
     exifread = ExifReadParser(file_prop.src_file)
-    date, parse_type = exifread.get_date()
+    date, parse_type = exifread.get_result()
     if date is None:
         pillow = PillowParser(file_prop.src_file)
-        date, parse_type = pillow.get_date()
+        date, parse_type = pillow.get_result()
     
     return date, parse_type
 
@@ -98,7 +98,7 @@ def get_date_taken(file_prop):
 
     if date is None and date_mod_check:
         fmod = FileModifiedParser(file_prop.src_file)
-        date, parse_type = fmod.get_date()
+        date, parse_type = fmod.get_result()
     
     return date, parse_type
 
@@ -140,10 +140,10 @@ def find_and_remove_duplicates(file_props):
 
 def copy_files(file_prop_list):
     if len(file_prop_list) > 0:
-        printProgressBar(0, len(file_prop_list), prefix = 'Copying:', suffix = 'Complete', length = 50)
+        print_progress_bar(0, len(file_prop_list), prefix = 'Copying:', suffix = 'Complete', length = 50)
         for i, fp in enumerate(file_prop_list):
             fp.copy()
-            printProgressBar(i + 1, len(file_prop_list), prefix = 'Copying:', suffix = 'Complete', length = 50)
+            print_progress_bar(i + 1, len(file_prop_list), prefix = 'Copying:', suffix = 'Complete', length = 50)
 
 if __name__ == '__main__':
 
@@ -165,7 +165,7 @@ if __name__ == '__main__':
     invalid_file_props = list()
     file_list = get_files_in_dir(root)
     
-    printProgressBar(0, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
+    print_progress_bar(0, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
     for i, file in enumerate(file_list):
         date_taken, parse_type = get_date_taken(file)
         if date_taken is None:
@@ -176,7 +176,7 @@ if __name__ == '__main__':
             file.set_date_taken(date_taken)
             file.parse_method = parse_type
             valid_file_props.append(file)
-        printProgressBar(i + 1, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
+        print_progress_bar(i + 1, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
 
     output_str = find_and_remove_duplicates(valid_file_props)
 
@@ -189,7 +189,7 @@ if __name__ == '__main__':
     print(TermColors.FAIL, "Found {} bad files!".format(len(invalid_file_props)), TermColors.ENDC)
     for fp in invalid_file_props:
         fmod = FileModifiedParser(fp.src_file)
-        date, parse_type = fmod.get_date()
+        date, parse_type = fmod.get_result()
         formatted_date = get_formatted_date(date)
         print(TermColors.FAIL, "{: <60} ---> {}".format(fp.get_src_file_name(), formatted_date), TermColors.ENDC)
 

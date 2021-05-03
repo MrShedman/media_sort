@@ -40,7 +40,7 @@ class FileModifiedParser:
         date = datetime.datetime.fromtimestamp(timestamp)
         self.date = check_valid_date(date)
 
-    def get_date(self):
+    def get_result(self):
         return self.date, self.type
 
 class PillowParser:
@@ -60,7 +60,7 @@ class PillowParser:
         else:
             self.date = None
 
-    def get_date(self):
+    def get_result(self):
         return self.date, self.type
 
 class ExifReadParser:
@@ -78,7 +78,7 @@ class ExifReadParser:
         
         f.close()
 
-    def get_date(self):
+    def get_result(self):
         return self.date, self.type
 
 class HachoirParser:
@@ -104,5 +104,5 @@ class HachoirParser:
         if date is not None:
             self.date = parse_date(date, format="%Y-%m-%d %H:%M:%S")
 
-    def get_date(self):
+    def get_result(self):
         return self.date, self.type
