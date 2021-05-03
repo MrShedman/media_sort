@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import io
 import datetime
 import shutil
 from PIL import Image
@@ -13,24 +12,8 @@ import exifread
 from collections import Counter
 from enum import Enum
 
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
-
-class ParseType(Enum):   
-    EXIFREAD = "exifread"
-    PILLOW = "Pillow"
-    HACHOIR = "hachoir"
-    FILEDATE = "File date"
-    ERROR = "No date found"
+from media_sort.parsers import FileModifiedParser, PillowParser, ExifReadParser, HachoirParser, ParseType
+from media_sort.utils import printProgressBar, print_to_string, TermColors
 
 def get_formatted_date(date):
     if date is not None:
@@ -89,27 +72,6 @@ class FileProperties:
     def __hash__(self):
         return hash(self.date_taken)
 
-def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
-    """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
-        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
-    """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
-    # Print New Line on Complete
-    if iteration == total: 
-        print()
-
 def get_files_in_dir(dir):
     file_list = list()
     for path, subdirs, files in os.walk(dir):
@@ -117,77 +79,18 @@ def get_files_in_dir(dir):
             file_list.append(FileProperties(os.path.join(path, name)))
     return file_list
 
-def get_value_in_nested_dict(d, key):
-    for k, v in d.items():
-        if isinstance(v, dict):
-            if key in v:
-                return v[key]
-            else:
-                get_value_in_nested_dict(v, key)
-        if key in v:
-            return v[key]
-    return None
-
-def check_valid_date(date):
-    if date > valid_date_limit:
-        return date
-    else:
-        return None
-
-def get_file_modified_date(file_prop):
-        timestamp = os.path.getmtime(file_prop.src_file)
-        date = datetime.datetime.fromtimestamp(timestamp)
-        return check_valid_date(date)
-
-def parse_date(date, format = "%Y:%m:%d %H:%M:%S"):
-    date_obj = None
-    try:
-        date_obj = datetime.datetime.strptime(str(date), format)
-    except:
-        return None
-    else: 
-        return check_valid_date(date_obj)
-
 def parse_video(file_prop):
-    parser = createParser(file_prop.src_file)
-    if not parser:
-        print("Unable to parse file %s" % file_prop.src_file)
-        return None
-    with parser:
-        try:
-            metadata = extractMetadata(parser)
-        except Exception as err:
-            print("Metadata extraction error: %s" % err)
-            metadata = None
-    if not metadata:
-        print("Unable to extract metadata")
-        return None
-    meta = metadata.exportDictionary()
-    date = get_value_in_nested_dict(meta, "Creation date")
-    if date is not None:
-        return parse_date(date, format="%Y-%m-%d %H:%M:%S")
-    return None
+    hachoir = HachoirParser(file_prop.src_file)
+    return hachoir.get_date()
 
 def parse_image(file_prop):
-    f = open(file_prop.src_file, 'rb')
-    dates = list()
-    dates.append(None)
-    tags = exifread.process_file(f, stop_tag="DateTimeOriginal", details=False)
-    field = "EXIF DateTimeOriginal"
+    exifread = ExifReadParser(file_prop.src_file)
 
-    if field in tags:
-        dates.append(parse_date(tags[field]))
-
-    if dates[-1] is None:
-        exif = Image.open(f).getexif()
-        tags = [36867, 306]
-        for tag in tags:
-            if tag in exif:
-                dates.append(parse_date(exif[tag]))
-    
-    dates_sorted = sorted(dates, key=lambda x: (x is None, x))
-    f.close()
-    return dates_sorted[0]
+    if exifread.get_date() is None:
+        pillow = PillowParser(file_prop.src_file)
+        return pillow.get_date()
+    else:
+        return exifread.get_date()
 
 def get_date_taken(file_prop):
     date = None
@@ -198,16 +101,10 @@ def get_date_taken(file_prop):
             date = parse_video(file_prop)
 
     if date is None and date_mod_check:
-        date = get_file_modified_date(file_prop)
+        fmod = FileModifiedParser(file_prop.src_file)
+        date = fmod.get_date()
     
     return date
-
-def print_to_string(*args, **kwargs):
-    output = io.StringIO()
-    print(*args, file=output, **kwargs)
-    contents = output.getvalue()
-    output.close()
-    return contents
 
 def find_and_remove_duplicates(file_props):
     d =  Counter(file_props) 
@@ -268,8 +165,6 @@ if __name__ == '__main__':
     date_mod_check = args.dm
     ignore_dup = args.id
 
-    valid_date_limit = datetime.datetime.strptime("2001:01:01 00:00:00", "%Y:%m:%d %H:%M:%S")
-
     valid_file_props = list()
     invalid_file_props = list()
     file_list = get_files_in_dir(root)
@@ -288,16 +183,17 @@ if __name__ == '__main__':
 
     output_str = find_and_remove_duplicates(valid_file_props)
 
-    print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_props)), bcolors.ENDC)
+    print(TermColors.OKGREEN, "Found {} good files!".format(len(valid_file_props)), TermColors.ENDC)
     for fp in valid_file_props:
-        print(bcolors.OKGREEN, "{: <60} ---> {}".format(fp.get_src_file_name(), fp.get_dst_file_name()), bcolors.ENDC)
+        print(TermColors.OKGREEN, "{: <60} ---> {}".format(fp.get_src_file_name(), fp.get_dst_file_name()), TermColors.ENDC)
 
-    print(bcolors.WARNING, output_str, bcolors.ENDC, end='')
+    print(TermColors.WARNING, output_str, TermColors.ENDC, end='')
 
-    print(bcolors.FAIL, "Found {} bad files!".format(len(invalid_file_props)), bcolors.ENDC)
+    print(TermColors.FAIL, "Found {} bad files!".format(len(invalid_file_props)), TermColors.ENDC)
     for fp in invalid_file_props:
-        formatted_date = get_formatted_date(get_file_modified_date(fp))
-        print(bcolors.FAIL, "{: <60} ---> {}".format(fp.get_src_file_name(), formatted_date), bcolors.ENDC)
+        fmod = FileModifiedParser(fp.src_file)
+        formatted_date = get_formatted_date(fmod.get_date())
+        print(TermColors.FAIL, "{: <60} ---> {}".format(fp.get_src_file_name(), formatted_date), TermColors.ENDC)
 
     if do_copy:
         copy_files(valid_file_props)
