@@ -7,4 +7,4 @@ setup(name="media_sort",
       author_email="roscoacer@googlemail.com",
       url="https://github.com/MrShedman/media_sort",
       packages=find_packages(),
-      install_requires=["Pillow", "filetype", "hachoir", "exifread"])
+      install_requires=["Pillow", "hachoir", "exifread"])

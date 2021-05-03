@@ -4,9 +4,6 @@ import os
 import io
 import datetime
 import shutil
-import filetype
-from os import listdir
-from os.path import isfile, join
 from PIL import Image
 from hachoir.parser import createParser
 from hachoir.metadata import extractMetadata
@@ -42,7 +39,6 @@ class FileProperties:
         return False
     
     def __hash__(self):
-        #print(hash(str(self)))
         return hash(self.date_str)
 
 def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
