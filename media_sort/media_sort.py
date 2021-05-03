@@ -58,8 +58,8 @@ def check_valid_date(date):
     else:
         return None
 
-def get_date_modified_time(file_name):
-        timestamp = os.path.getmtime(file_name)
+def get_file_modified_date(file_prop):
+        timestamp = os.path.getmtime(file_prop.src_file)
         date = datetime.datetime.fromtimestamp(timestamp)
         return check_valid_date(date)
 
@@ -87,30 +87,21 @@ class FileProperties:
         self.is_valid = False
         self.date_append = ""
 
-    def get_original_file_name(self):
+    def get_src_file_name(self):
         return self.src_file.replace(self.root_path, "")
 
     def get_dst_file_name(self):
         return self.dst_file.replace(self.root_path, "")
 
-    # def get_formatted_date(self):
-    #     if self.date_taken is not None:
-    #         date_taken_str = date_taken.strftime("%Y_%m_%d_%H_%M_%S")
-    #     else:
-    #         date_taken_str = "ERR_DATE"
-    #     return date_taken_str
-
     def set_date_as_file_name(self):
-            #if self.date_taken is not None:
-            # date_taken_str = str(self.date_taken)
-            # bad_chars = ":- "
-            # for i in bad_chars:
-            #     date_taken_str = date_taken_str.replace(i, '_')
-
         filename, ext = os.path.splitext(os.path.basename(self.src_file))
         self.dst_file = self.dst_file.replace(filename, get_formatted_date(self.date_taken))
 
-
+    def copy(self):
+        dirname = os.path.dirname(self.dst_file)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        shutil.copy(self.src_file, self.dst_file)
 
     def __eq__(self, other):
         if type(other) is type(self):
@@ -148,17 +139,17 @@ def get_files_in_dir(dir):
             file_list.append(FileProperties(os.path.join(path, name)))
     return file_list
 
-def get_pretty_name(date_taken):
-    if date_taken is not None:
-        date_taken_str = date_taken.strftime("%Y_%m_%d_%H_%M_%S")
-    else:
-        date_taken_str = "ERR_DATE"
-    return date_taken_str
+# def get_pretty_name(date_taken):
+#     if date_taken is not None:
+#         date_taken_str = date_taken.strftime("%Y_%m_%d_%H_%M_%S")
+#     else:
+#         date_taken_str = "ERR_DATE"
+#     return date_taken_str
 
-def get_file_modified_time(filename):
-    timestamp = os.path.getmtime(filename)
-    date = datetime.datetime.fromtimestamp(timestamp)
-    return check_valid_date(date)
+# def get_file_modified_time(filename):
+#     timestamp = os.path.getmtime(filename)
+#     date = datetime.datetime.fromtimestamp(timestamp)
+#     return check_valid_date(date)
 
 def get_value_in_nested_dict(d, key):
     for k, v in d.items():
@@ -277,7 +268,6 @@ def parse_image(file_prop):
 #     return date
 
 def get_date_taken(file_prop):
-    #file_type = mimetypes.guess_type(path)[0]
     date = None
     if file_prop.file_type is not None:
         if "image" in file_prop.file_type:
@@ -285,8 +275,8 @@ def get_date_taken(file_prop):
         else:
             date = parse_video(file_prop)
 
-    # if date is None and date_mod_check:
-    #     date = get_file_modified_time(path)
+    if date is None and date_mod_check:
+        date = get_file_modified_date(file_prop)
     
     return date
 
@@ -316,7 +306,7 @@ def handle_invalid(file):
     # if copy_files:
     #     shutil.copy(file, dest_file)
     file.dst_file = file.src_file.replace(file.root_path, invalid_dest)
-    invalid_file_names.append(file)
+    invalid_file_props.append(file)
 
 # def handle_valid(file):
 #     dest_dir, filename, ext = get_dest_dir(file, valid_dest)
@@ -430,6 +420,7 @@ if __name__ == '__main__':
     invalid_file_names = list()
     valid_file_names = list()
     valid_file_props = list()
+    invalid_file_props = list()
     file_list = get_files_in_dir(root)
     
     printProgressBar(0, len(file_list), prefix = 'Searching:', suffix = 'Complete', length = 50)
@@ -450,17 +441,26 @@ if __name__ == '__main__':
 
     print(bcolors.OKGREEN, "Found {} good files!".format(len(valid_file_names)), bcolors.ENDC)
     for fp in valid_file_props:
-        print(bcolors.OKGREEN, "{: <60} ---> {}".format(fp.get_original_file_name(), fp.get_dst_file_name()), bcolors.ENDC)
+        print(bcolors.OKGREEN, "{: <60} ---> {}".format(fp.get_src_file_name(), fp.get_dst_file_name()), bcolors.ENDC)
 
 
     #print(bcolors.WARNING, output_str, bcolors.ENDC, end='')
 
-    print(bcolors.FAIL, "Found {} bad files!".format(len(invalid_file_names)), bcolors.ENDC)
-    for fp in invalid_file_names:
-        print(bcolors.FAIL, "{: <60} ---> {}".format(fp.get_original_file_name(), get_formatted_date(get_date_modified_time(fp.src_file))), bcolors.ENDC)
+    print(bcolors.FAIL, "Found {} bad files!".format(len(invalid_file_props)), bcolors.ENDC)
+    for fp in invalid_file_props:
+        formatted_date = get_formatted_date(get_file_modified_date(fp))
+        print(bcolors.FAIL, "{: <60} ---> {}".format(fp.get_src_file_name(), formatted_date), bcolors.ENDC)
 
-    # if copy_files:
-    #     printProgressBar(0, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
-    #     for i, fp in enumerate(valid_file_props):
-    #         shutil.copy(fp.src_file, fp.dest_file)
-    #         printProgressBar(i + 1, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
+    if copy_files:
+        printProgressBar(0, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
+        for i, fp in enumerate(valid_file_props):
+            #shutil.copy(fp.src_file, fp.dest_file)
+            fp.copy()
+            printProgressBar(i + 1, len(valid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
+
+    if copy_files:
+        printProgressBar(0, len(invalid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
+        for i, fp in enumerate(invalid_file_props):
+            #shutil.copy(fp.src_file, fp.dest_file)
+            fp.copy()
+            printProgressBar(i + 1, len(invalid_file_props), prefix = 'Copying:', suffix = 'Complete', length = 50)
