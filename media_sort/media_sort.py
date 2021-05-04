@@ -5,7 +5,6 @@ import datetime
 import shutil
 import argparse
 import mimetypes
-from collections import Counter
 
 from media_sort.parsers import FileModifiedParser, PillowParser, ExifReadParser, HachoirParser, ParseType
 from media_sort.utils import print_progress_bar, print_to_string, TermColors
@@ -103,35 +102,30 @@ def get_date_taken(file_prop):
     return date, parse_type
 
 def find_and_remove_duplicates(file_props):
-    d =  Counter(file_props) 
-    res = [k for k, v in d.items() if v > 1]
-    dups = dict()
-    for fp_dup in res:
-        dups[fp_dup.date_taken] = [fp_dup]
-        for fp in file_props:
-            if fp_dup == fp and fp_dup.src_file != fp.src_file:
-                dups[fp_dup.date_taken].append(fp)
+    dict_fp = dict()
 
+    for i, fp in enumerate(file_props):
+        if fp in dict_fp:
+            dict_fp[fp].append((fp, i))
+        else:
+            dict_fp[fp] = [(fp, i)]
+
+    indices_to_remove = list()
     output_str = str()
-    output_str += print_to_string("Found {} duplicate files!".format(len(dups)))
-    for key, fp_list in dups.items():
-        fp_list = sorted(fp_list, key=lambda x:x.size, reverse=True)
-        output_str += print_to_string("Duplicates: ")
-        for fp in fp_list:
-            output_str += print_to_string("\t{:<80}{}".format(fp.get_src_file_name(), fp.file_type))
-        output_str += print_to_string()
+    for key, fp_list in dict_fp.items():
+        if len(fp_list) > 1:
+            output_str += print_to_string("Found {} duplicate files!".format(len(fp_list)))
+            fp_list = sorted(fp_list, key=lambda x:x[0].size, reverse=True)
+            for i, (fp, oc) in enumerate(fp_list[1:]):
+                fp.set_duplicate_count(i+1)
+                indices_to_remove.append(oc)
+            for fp, oc in fp_list:
+                output_str += print_to_string("\t{:<80}{}".format(fp.get_src_file_name(), fp.file_type))
+            output_str += print_to_string()
 
-    for key, fp_list in dups.items():
-        for c, fp in enumerate(fp_list[1:]):
-            base_filename, base_ext = os.path.splitext(fp_list[0].src_file)
-            count = c + 1
-            for i, fpv in enumerate(file_props):
-                if fp == fpv:
-                    if fp.src_file == fpv.src_file:
-                        fp.set_duplicate_count(count)
-                        count += 1
-                        if not ignore_dup:
-                            del file_props[i]
+    if not ignore_dup:
+        file_props[:] = [fp for i, fp in enumerate(file_props) if i not in indices_to_remove]
+
     if ignore_dup:
         return "Found 0 duplicate files!\n"
     else:
@@ -181,7 +175,7 @@ if __name__ == '__main__':
 
     print(TermColors.OKGREEN, "Found {} good files!".format(len(valid_file_props)), TermColors.ENDC)
     for fp in valid_file_props:
-        print(TermColors.OKGREEN, "{: <60} {} --- {} ---> {}".format(fp.get_src_file_name(), fp.file_type, fp.parse_method.value, fp.get_dst_file_name()), TermColors.ENDC)
+        print(TermColors.OKGREEN, "{: <60} {: <20}{: <20}---> {}".format(fp.get_src_file_name(), fp.file_type, fp.parse_method.value, fp.get_dst_file_name()), TermColors.ENDC)
 
     print(TermColors.WARNING, output_str, TermColors.ENDC, end='')
 
@@ -190,7 +184,7 @@ if __name__ == '__main__':
         fmod = FileModifiedParser(fp.src_file)
         date, parse_type = fmod.get_result()
         formatted_date = get_formatted_date(date)
-        print(TermColors.FAIL, "{: <60} {} ---> {}".format(fp.get_src_file_name(), fp.file_type, formatted_date), TermColors.ENDC)
+        print(TermColors.FAIL, "{: <60}{: <20}---> {}".format(fp.get_src_file_name(), fp.file_type, formatted_date), TermColors.ENDC)
 
     if do_copy:
         copy_files(valid_file_props)
