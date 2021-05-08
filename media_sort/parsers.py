@@ -87,16 +87,16 @@ class HachoirParser(ParserBase):
         super().__init__(ParseType.HACHOIR)
         parser = createParser(file_name)
         if not parser:
-            print("Unable to parse file %s" % file_name)
+            #print("Unable to parse file %s" % file_name)
             return None
         with parser:
             try:
                 metadata = extractMetadata(parser)
             except Exception as err:
-                print("Metadata extraction error: %s" % err)
+                #print("Metadata extraction error: %s" % err)
                 metadata = None
         if not metadata:
-            print("Unable to extract metadata")
+            #print("Unable to extract metadata")
             return None
         meta = metadata.exportDictionary()
         date = get_value_in_nested_dict(meta, "Creation date")
