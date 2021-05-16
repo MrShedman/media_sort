@@ -34,6 +34,12 @@ def print_progress_bar(iteration, total, prefix = '', suffix = '', decimals = 1,
     if iteration == total: 
         print()
 
+def format_date(date):
+    if date is not None:
+        return date.strftime("%Y_%m_%d_%H_%M_%S")
+    else:
+        return "ERR_DATE"
+
 def print_to_string(*args, **kwargs):
     output = io.StringIO()
     print(*args, file=output, **kwargs)
