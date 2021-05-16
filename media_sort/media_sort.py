@@ -3,7 +3,7 @@
 import os
 import argparse
 
-from media_sort.file_properties import FileProperties, get_files_in_dir
+from media_sort.file_properties import get_files_in_dir
 from media_sort.parsers import FileModifiedParser, PillowParser, ExifReadParser, HachoirParser, ParseType
 from media_sort.utils import format_date, print_progress_bar, print_to_string, TermColors
 
