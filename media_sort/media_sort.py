@@ -107,18 +107,18 @@ if __name__ == '__main__':
 
     output_str = find_and_remove_duplicates(valid_file_props)
 
-    print(TermColors.OKGREEN, "Found {} good files!".format(len(valid_file_props)), TermColors.ENDC)
+    print(TermColors.OKGREEN + "Found {} good files!".format(len(valid_file_props)) + TermColors.ENDC)
     for fp in valid_file_props:
-        print(TermColors.OKGREEN, "{: <80} {: <20}{: <20}---> {}".format(fp.get_src_file_name(), fp.file_type, fp.parse_method.value, fp.get_dst_file_name()), TermColors.ENDC)
+        print(TermColors.OKGREEN + "{: <80} {: <20}{: <20}---> {}".format(fp.get_src_file_name(), fp.file_type, fp.parse_method.value, fp.get_dst_file_name()) + TermColors.ENDC)
 
-    print(TermColors.WARNING, output_str, TermColors.ENDC, end='')
+    print(TermColors.WARNING + output_str + TermColors.ENDC, end='')
 
-    print(TermColors.FAIL, "Found {} bad files!".format(len(invalid_file_props)), TermColors.ENDC)
+    print(TermColors.FAIL + "Found {} bad files!".format(len(invalid_file_props)) + TermColors.ENDC)
     for fp in invalid_file_props:
         fmod = FileModifiedParser(fp.src_file)
         date, parse_type = fmod.get_result()
         formatted_date = format_date(date)
-        print(TermColors.FAIL, "{: <80}{: <20}---> {}".format(fp.get_src_file_name(), fp.file_type, formatted_date), TermColors.ENDC)
+        print(TermColors.FAIL + "{: <80}{: <20}---> {}".format(fp.get_src_file_name(), fp.file_type, formatted_date) + TermColors.ENDC)
 
     if do_copy:
         copy_files(valid_file_props)

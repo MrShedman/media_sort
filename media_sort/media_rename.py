@@ -28,11 +28,11 @@ if __name__ == '__main__':
     do_rename = args.rename
 
     if args.year:
-        print(TermColors.OKGREEN, "Change year to {}".format(args.year), TermColors.ENDC)
+        print(TermColors.OKGREEN + "Change year to {}".format(args.year) + TermColors.ENDC)
     if args.month:
-        print(TermColors.OKGREEN, "Change month to {}".format(args.month), TermColors.ENDC)
+        print(TermColors.OKGREEN +"Change month to {}".format(args.month) + TermColors.ENDC)
     if args.day:
-        print(TermColors.OKGREEN, "Change day to {}".format(args.day), TermColors.ENDC)
+        print(TermColors.OKGREEN +"Change day to {}".format(args.day) + TermColors.ENDC)
 
     file_list = get_files_in_dir(os.getcwd())
 
