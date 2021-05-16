@@ -15,6 +15,18 @@ def modify_date(dt, year=None, month=None, day=None):
     if kwargs : return dt.replace(**kwargs)
     else      : return dt
 
+def get_date(date_str):
+    try:
+        return datetime.datetime.strptime(date_str, "%Y_%m_%d_%H_%M_%S"), None
+    except:
+        pass
+    try:    
+        date_list = name.split("_")
+        date_str = '_'.join(date_list[:-1])
+        return datetime.datetime.strptime(date_str, "%Y_%m_%d_%H_%M_%S"), date_list[-1]
+    except:
+        raise
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -30,17 +42,19 @@ if __name__ == '__main__':
     if args.year:
         print(TermColors.OKGREEN + "Change year to {}".format(args.year) + TermColors.ENDC)
     if args.month:
-        print(TermColors.OKGREEN +"Change month to {}".format(args.month) + TermColors.ENDC)
+        print(TermColors.OKGREEN + "Change month to {}".format(args.month) + TermColors.ENDC)
     if args.day:
-        print(TermColors.OKGREEN +"Change day to {}".format(args.day) + TermColors.ENDC)
+        print(TermColors.OKGREEN + "Change day to {}".format(args.day) + TermColors.ENDC)
 
     file_list = get_files_in_dir(os.getcwd())
 
     for i, file in enumerate(file_list):
         name, ext = os.path.splitext(os.path.basename(file.src_file))
-        date = datetime.datetime.strptime(name, "%Y_%m_%d_%H_%M_%S")
+        date, dupe = get_date(name)
         date = modify_date(date, args.year, args.month, args.day)
         file.set_date_taken(date)
+        if dupe is not None:
+            file.set_duplicate_count(int(dupe))
         print("{: <60}--->{}".format(file.get_src_file_name(), file.get_dst_file_name()))
         if do_rename:
             os.rename(file.src_file, file.dst_file)
