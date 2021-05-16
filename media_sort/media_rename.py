@@ -4,8 +4,8 @@ import os
 import argparse
 import datetime
 
-from media_sort.file_properties import FileProperties, get_files_in_dir
-from media_sort.utils import format_date, print_progress_bar, print_to_string, TermColors
+from media_sort.file_properties import get_files_in_dir
+from media_sort.utils import format_date, TermColors
 
 def modify_date(dt, year=None, month=None, day=None):
     kwargs = {}
@@ -26,7 +26,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     do_rename = args.rename
-    # print(do_rename)
 
     if args.year:
         print(TermColors.OKGREEN, "Change year to {}".format(args.year), TermColors.ENDC)
@@ -41,8 +40,7 @@ if __name__ == '__main__':
         name, ext = os.path.splitext(os.path.basename(file.src_file))
         date = datetime.datetime.strptime(name, "%Y_%m_%d_%H_%M_%S")
         date = modify_date(date, args.year, args.month, args.day)
-        date_str = format_date(date)
-        file.dst_file = file.src_file.replace(name, date_str)
+        file.set_date_taken(date)
         print("{: <60}--->{}".format(file.get_src_file_name(), file.get_dst_file_name()))
         if do_rename:
             os.rename(file.src_file, file.dst_file)
